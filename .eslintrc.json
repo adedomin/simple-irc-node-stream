@@ -14,6 +14,8 @@
     "extends": "eslint:recommended",
     "ignorePatterns": [ "*.bundle.js" ],
     "rules": {
+        "no-unused-vars": "off",
+        "@typescript-eslint/no-unused-vars": "error",
         // 'use strict';
         "strict": [ "error", "global" ],
         // preference, some like 2
@@ -56,7 +58,7 @@
         // else {
         //   somethingElse();
         // }
-        "brace-style": [ "error", "allman" ],
+        "brace-style": [ "warn", "stroustrup" ],
         "spaced-comment": [ "error" ], 
         "space-before-blocks": [ "error" ],
         "keyword-spacing": [ "error" ],

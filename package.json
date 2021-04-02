@@ -1,12 +1,25 @@
 {
     "name": "simple-irc-stream",
     "version": "2021.01.02",
+    "main": "./dist/src/simple-irc.js",
+    "types": "./dist/src/simple-irc.d.ts",
+    "files": [
+        "dist/src/*"
+    ],
+    "scripts": {
+        "prepack": "npx tsc --declaration",
+        "test": "node dist/test/irc-random-msg.js"
+    },
+    "repository": "https://github.com/adedomin/simple-irc",
+    "author": "Anthony DeDominic <adedomin@gmail.com>",
+    "license": "MIT",
     "devDependencies": {
         "@tsconfig/node14": "^1.0.0",
         "@types/node": "^14.14.19",
         "@typescript-eslint/eslint-plugin": "^4.11.1",
         "@typescript-eslint/parser": "^4.11.1",
         "eslint": "^7.17.0",
+        "testing-prng": "adedomin/testing-prng",
         "typescript": "^4.1.3"
     }
 }
