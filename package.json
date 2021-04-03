@@ -1,6 +1,6 @@
 {
     "name": "simple-irc-stream",
-    "version": "2021.01.02",
+    "version": "2021.4.3",
     "main": "./dist/src/simple-irc.js",
     "types": "./dist/src/simple-irc.d.ts",
     "files": [
