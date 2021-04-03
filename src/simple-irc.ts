@@ -29,19 +29,19 @@ class SimpleIrcIn extends Transform {
     #encode: TransformOptions['encoding'];
     #chunk = '';
 
-    constructor(options: TransformOptions = {}) {
-        super({ ...options, objectMode: true });
-        this.#encode = options?.encoding ?? 'utf8';
+    constructor(encoding: TransformOptions['encoding'] = 'utf8') {
+        super({ readableObjectMode: true });
+        this.#encode = encoding;
     }
 
     _transform(
         data: (Buffer|string|any),
-        encoding: TransformOptions['encoding'],
+        encoding: TransformOptions['encoding']|'buffer',
         callback: WriteCallback,
     ): void {
         let textData: string;
         if (data instanceof Buffer) {
-            textData = data.toString(encoding ?? this.#encode);
+            textData = data.toString(encoding === 'buffer' ? this.#encode : encoding);
         }
         else if (typeof data === 'string') {
             textData = data;
@@ -67,22 +67,22 @@ class SimpleIrcIn extends Transform {
 class SimpleIrcOut extends Transform {
     #encode: TransformOptions['encoding'];
 
-    constructor(options: TransformOptions = {}) {
-        super({ ...options, objectMode: true });
-        this.#encode = options?.encoding ?? 'utf8';
+    constructor(encoding: TransformOptions['encoding'] = 'utf8') {
+        super({ writableObjectMode: true });
+        this.#encode = encoding ?? 'utf8';
     }
 
     _transform(
         data: (IrcMessage|string|any),
-        encoding: TransformOptions['encoding'],
+        encoding: TransformOptions['encoding']|'buffer',
         callback: WriteCallback,
     ): void {
         let outBuffer: Buffer;
         if (data instanceof IrcMessage) {
-            outBuffer = data.toEncodedString(encoding ?? this.#encode);
+            outBuffer = data.toEncodedString(this.#encode);
         }
         else if (typeof data === 'string') {
-            outBuffer = Buffer.from(data, encoding ?? this.#encode);
+            outBuffer = Buffer.from(data, this.#encode);
         }
         else {
             const err = new TypeError('data is not an IrcMessage or a string');
@@ -94,9 +94,9 @@ class SimpleIrcOut extends Transform {
     }
 }
 
-function SimpleIrc(encoding: TransformOptions['encoding']): [ SimpleIrcIn, SimpleIrcOut ] {
-    const inp = new SimpleIrcIn({ encoding });
-    const out = new SimpleIrcOut({ encoding });
+function SimpleIrc(encoding: TransformOptions['encoding'] = 'utf8'): [ SimpleIrcIn, SimpleIrcOut ] {
+    const inp = new SimpleIrcIn(encoding);
+    const out = new SimpleIrcOut(encoding);
     return [ inp, out ];
 }
 
