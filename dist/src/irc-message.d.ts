@@ -10,10 +10,11 @@ declare class IrcMessage {
     sender: Sender;
     command: string;
     parameters: string[];
+    private tokenizeMain;
     private parseTag;
     private parseSender;
     toEncodedString(encoding: BufferEncoding | undefined): Buffer;
     toString(): string;
-    constructor(message: string);
+    constructor(m: string);
 }
 export { IrcMessage };

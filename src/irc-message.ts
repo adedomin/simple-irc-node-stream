@@ -19,15 +19,18 @@
 
 'use strict';
 
-interface Sender
-{
+interface Sender {
     nick?: string,
     user?: string,
     host?: string,
 }
 
-enum ParserState
-{
+enum TokenState {
+    Word,
+    Space,
+}
+
+enum ParserState {
     Tag,
     Sender,
     Command,
@@ -41,9 +44,35 @@ class IrcMessage {
     command: string = '';
     parameters: string[] = [];
 
-    #ircTokenizer = /(?<word>\S+)|(?<space>\s+)/g;
     #tagGrammar = /(?<key>[^;=\s]+)(?:=(?<val>[^;\s]+))?;?/g;
-    #senderGrammar = /^:(?<nick>[^!\s]+)!(?<user>[^\s@]+)@(?<host>[^\s]+)$/;
+
+    private *tokenizeMain(input: string): Generator<[TokenState, string], void, void> {
+        // start state depends on if we have leading space or not.
+        let state = input[0] === ' '
+            ? TokenState.Space
+            : TokenState.Word;
+        let tokenStart = 0;
+        for (let i = 0; i < input.length; ++i) {
+            const chr = input[i];
+            switch (state) {
+            case TokenState.Word:
+                if (chr === ' ') {
+                    yield [ state, input.slice(tokenStart, i) ];
+                    tokenStart = i;
+                    state = TokenState.Space;
+                }
+                break;
+            case TokenState.Space:
+                if (chr !== ' ') {
+                    yield [ state, input.slice(tokenStart, i) ];
+                    tokenStart = i;
+                    state = TokenState.Word;
+                }
+                break;
+            }
+        }
+        yield [ state, input.slice(tokenStart) ];
+    }
 
     private parseTag(tagstr: string): void {
         for (const { groups } of tagstr.slice(1).matchAll(this.#tagGrammar)) {
@@ -52,10 +81,20 @@ class IrcMessage {
     }
 
     private parseSender(senderstr: string): void {
-        const { groups } = senderstr.match(this.#senderGrammar) ?? {};
-        this.sender.nick = groups?.nick ?? senderstr.slice(1);
-        this.sender.user = groups?.user;
-        this.sender.host = groups?.host;
+        let start_user = senderstr.indexOf('!');
+        let start_host = senderstr.indexOf('@', start_user+1);
+
+        // work backwards
+        if (start_host !== -1) this.sender.host =
+            senderstr.slice(start_host+1);
+        else start_host = senderstr.length;
+
+        if (start_user !== -1) this.sender.user =
+            senderstr.slice(start_user+1, start_host);
+        else start_user = start_host;
+
+        // This assumes this is always nonzero length, which may not be true.
+        this.sender.nick = senderstr.slice(1, start_user);
     }
 
     toEncodedString(encoding: BufferEncoding|undefined): Buffer {
@@ -86,63 +125,62 @@ class IrcMessage {
         return `${tags !== '' ? `@${tags} ` : ''}${sender !== '' ? `${sender} ` : ''}${this.command}${params !== '' ? ` ${params}` : ''}\r\n`;
     }
 
-    constructor(message: string) {
+    constructor(m: string) {
+        // Strip line separators.
+        const message = m.endsWith('\r\n')
+            ? m.slice(0, m.length-2)
+            : m.endsWith('\n')
+                ? m.slice(0, m.length-1)
+                : m;
         let parseState: ParserState = ParserState.Tag;
-        for (const { groups } of message.matchAll(this.#ircTokenizer)) {
-            for (const m in groups) {
-                const match = groups[m];
-                if (match === undefined) {
-                    continue;
-                }
-                else if (
-                    m === 'space' &&
-                    parseState !== ParserState.Multi
-                ) {
-                    continue;
-                }
+        for (const [ is_a, token ] of this.tokenizeMain(message)) {
+            if (is_a === TokenState.Space &&
+                parseState !== ParserState.Multi
+            ) {
+                continue;
+            }
 
-                let handled = false;
-                // a GOTO, if you will.
-                while (!handled) {
-                    switch (parseState as ParserState) {
-                    case ParserState.Tag:
-                        if (match[0] === '@') {
-                            this.parseTag(match);
-                            handled = true;
-                        }
-                        else {
-                            parseState = ParserState.Sender;
-                        }
-                        break;
-                    case ParserState.Sender:
-                        if (match[0] === ':') {
-                            this.parseSender(match);
-                            handled = true;
-                        }
-                        else {
-                            parseState = ParserState.Command;
-                        }
-                        break;
-                    case ParserState.Command:
-                        this.command = match;
-                        parseState = ParserState.Params;
-                        handled = true;
-                        break;
-                    case ParserState.Params:
-                        if (match[0] !== ':') {
-                            this.parameters.push(match);
-                            handled = true;
-                        }
-                        else {
-                            parseState = ParserState.Multi;
-                            this.parameters.push(match.slice(1));
-                            handled = true;
-                        }
-                        break;
-                    case ParserState.Multi:
-                        this.parameters[this.parameters.length-1] += match;
+            let handled = false;
+            // a GOTO, if you will.
+            while (!handled) {
+                switch (parseState as ParserState) {
+                case ParserState.Tag:
+                    if (token[0] === '@') {
+                        this.parseTag(token);
                         handled = true;
                     }
+                    else {
+                        parseState = ParserState.Sender;
+                    }
+                    break;
+                case ParserState.Sender:
+                    if (token[0] === ':') {
+                        this.parseSender(token);
+                        handled = true;
+                    }
+                    else {
+                        parseState = ParserState.Command;
+                    }
+                    break;
+                case ParserState.Command:
+                    this.command = token;
+                    parseState = ParserState.Params;
+                    handled = true;
+                    break;
+                case ParserState.Params:
+                    if (token[0] !== ':') {
+                        this.parameters.push(token);
+                        handled = true;
+                    }
+                    else {
+                        parseState = ParserState.Multi;
+                        this.parameters.push(token.slice(1));
+                        handled = true;
+                    }
+                    break;
+                case ParserState.Multi:
+                    this.parameters[this.parameters.length-1] += token;
+                    handled = true;
                 }
             }
         }
