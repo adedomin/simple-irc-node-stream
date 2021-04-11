@@ -34,6 +34,21 @@ class SimpleIrcIn extends Transform {
         this.#encode = encoding;
     }
 
+    _nextline(): [ number, number ] {
+        const chunk = this.#chunk;
+        const iterlen = Math.min(chunk.length, 512);
+        for (let i = 0; i < iterlen; ++i) {
+            const chr = chunk[i];
+            if (chr === '\r' && i+1 < iterlen && chunk[i+1] === '\n') {
+                return [ i, i+2 ];
+            }
+            else if (chr === '\n') return [ i, i + 1 ];
+            else if (chr === '\r') return [ i, i + 1 ];
+        }
+        if (iterlen === 512) return [ 512, 513 ];
+        else return [ -1, -1 ];
+    }
+
     _transform(
         data: (Buffer|string|any),
         encoding: TransformOptions['encoding']|'buffer',
@@ -52,12 +67,12 @@ class SimpleIrcIn extends Transform {
         }
 
         this.#chunk += textData;
-        let nextLine = this.#chunk.indexOf('\r\n');
+        let [ nextLine, skip ] = this._nextline();
         while (nextLine > -1) {
             const line = this.#chunk.slice(0, nextLine);
-            this.#chunk = this.#chunk.slice(nextLine+2);
+            this.#chunk = this.#chunk.slice(skip);
             this.push(new IrcMessage(line));
-            nextLine = this.#chunk.indexOf('\r\n');
+            [ nextLine, skip ] = this._nextline();
         }
 
         callback();

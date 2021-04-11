@@ -41,6 +41,24 @@ class SimpleIrcIn extends stream_1.Transform {
         _chunk.set(this, '');
         __classPrivateFieldSet(this, _encode, encoding);
     }
+    _nextline() {
+        const chunk = __classPrivateFieldGet(this, _chunk);
+        const iterlen = Math.min(chunk.length, 512);
+        for (let i = 0; i < iterlen; ++i) {
+            const chr = chunk[i];
+            if (chr === '\r' && i + 1 < iterlen && chunk[i + 1] === '\n') {
+                return [i, i + 2];
+            }
+            else if (chr === '\n')
+                return [i, i + 1];
+            else if (chr === '\r')
+                return [i, i + 1];
+        }
+        if (iterlen === 512)
+            return [512, 513];
+        else
+            return [-1, -1];
+    }
     _transform(data, encoding, callback) {
         let textData;
         if (data instanceof Buffer) {
@@ -54,12 +72,12 @@ class SimpleIrcIn extends stream_1.Transform {
             return callback(err);
         }
         __classPrivateFieldSet(this, _chunk, __classPrivateFieldGet(this, _chunk) + textData);
-        let nextLine = __classPrivateFieldGet(this, _chunk).indexOf('\r\n');
+        let [nextLine, skip] = this._nextline();
         while (nextLine > -1) {
             const line = __classPrivateFieldGet(this, _chunk).slice(0, nextLine);
-            __classPrivateFieldSet(this, _chunk, __classPrivateFieldGet(this, _chunk).slice(nextLine + 2));
+            __classPrivateFieldSet(this, _chunk, __classPrivateFieldGet(this, _chunk).slice(skip));
             this.push(new irc_message_1.IrcMessage(line));
-            nextLine = __classPrivateFieldGet(this, _chunk).indexOf('\r\n');
+            [nextLine, skip] = this._nextline();
         }
         callback();
     }

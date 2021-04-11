@@ -6,6 +6,7 @@ declare type WriteCallback = (err?: Error) => void;
 declare class SimpleIrcIn extends Transform {
     #private;
     constructor(encoding?: TransformOptions['encoding']);
+    _nextline(): [number, number];
     _transform(data: (Buffer | string | any), encoding: TransformOptions['encoding'] | 'buffer', callback: WriteCallback): void;
 }
 declare class SimpleIrcOut extends Transform {
